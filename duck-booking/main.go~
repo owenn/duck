@@ -1,0 +1,127 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"net/http"
+	"os"
+	"time"
+)
+
+func Hello() string {
+	return "Hello, world"
+}
+
+type Ducks struct {
+	ID   string `json:"id"`
+	NAME string `json:"name"`
+	URL  string `json:"URL"`
+}
+
+// AppState holds shared application data
+type AppState struct {
+	AppName  string
+	Version  string
+	ImageDir string
+}
+
+func getAllTheDucks() []Ducks {
+
+	allTheDucks := []Ducks{
+		{ID: "1", NAME: "affy", URL: "unknown"},
+		{ID: "2", NAME: "ffy", URL: "unknown"},
+		{ID: "3", NAME: "fy", URL: "unknown"},
+		{ID: "4", NAME: "tst", URL: "unknown"},
+		{ID: "5", NAME: "test2", URL: "unknown"},
+		{ID: "6", NAME: "test3", URL: "unknown"},
+		{ID: "7", NAME: "test4", URL: "unknown"},
+	}
+
+	return (allTheDucks)
+}
+
+// ListFiles retrieves the list of file names from a given directory
+func listFiles(directory string) ([]string, error) {
+	files, err := os.ReadDir(directory)
+	if err != nil {
+		return nil, err
+	}
+
+	var fileList []string
+	for _, file := range files {
+		fileList = append(fileList, file.Name())
+	}
+	return fileList, nil
+}
+
+// ListFilesHandler handles HTTP requests and returns file names as JSON
+func ListFilesHandler(w http.ResponseWriter, r *http.Request) {
+	directory := "./files" // Change this to your target directory
+
+	fileList, err := listFiles(directory)
+	if err != nil {
+		http.Error(w, "Failed to read directory", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(fileList)
+}
+
+func getDucks(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+
+	json.NewEncoder(w).Encode(getAllTheDucks())
+
+	return
+
+}
+
+func getParticularDuck(w http.ResponseWriter, r *http.Request) {
+
+	id := chi.URLParam(r, "duckid")
+	fmt.Print("the id = ", id, "\n")
+
+	return
+}
+
+// Middleware to inject app state into the request context
+func AppStateMiddleware(appState *AppState) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := context.WithValue(r.Context(), appStateKey, appState)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func main() {
+	// Create a new router
+	r := chi.NewRouter()
+
+	// A good base middleware stack - will neeed to work out what
+	// it offers
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+
+	r.Use(middleware.Timeout(60 * time.Second))
+
+	// Define a simple handler for the root path
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Hello, World!"))
+	})
+
+	r.Route("/ducks", func(r chi.Router) {
+		r.Get("/", getDucks)                  // GET /articles
+		r.Get("/{duckid}", getParticularDuck) // GET /articles/01-16-2017
+	})
+
+	// Start the server
+	http.ListenAndServe(":2001", r)
+}
