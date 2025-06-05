@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tiled Image Viewer</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    #gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+      padding: 20px;
+    }
+    .image-tile img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+  </style>
+</head>
+<body>
+
+<div id="gallery">Loading images...</div>
+
+<script>
+  const imageDataURL = '/ducks/'; // Replace with your actual URL
+
+  async function fetchAndDisplayImages() {
+    try {
+      const response = await fetch(imageDataURL);
+      if (!response.ok) throw new Error('Failed to fetch image data');
+
+      const imagesData = await response.json();
+      const gallery = document.getElementById('gallery');
+      gallery.innerHTML = ''; // Clear "Loading..." text
+
+      imagesData.forEach(duck => {
+        const div = document.createElement('div');
+        div.className = 'image-tile';
+
+        const img = document.createElement('img');
+        img.src = "/ducks/" + duck.URL;
+        img.alt = 'Image';
+
+        div.appendChild(img);
+        gallery.appendChild(div);
+      });
+    } catch (error) {
+      document.getElementById('gallery').textContent = 'Error loading images: ' + error.message;
+    }
+  }
+
+  fetchAndDisplayImages();
+</script>
+
+</body>
+</html>

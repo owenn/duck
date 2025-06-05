@@ -7,18 +7,21 @@ import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"net/http"
-	"os"
-	//	"strings"
 	"io/fs"
 	"log"
+	"net/http"
+	"os"
 	"regexp"
 	"strconv"
+	//	"strings"
 	"time"
 )
 
 //go:embed assets/*.png
 var duckImages embed.FS
+
+//go:embed html/*.html
+var htmlFS embed.FS
 
 //go:embed assets/duckIndex.json
 var duckIndex string
@@ -80,20 +83,15 @@ func loadDucksIntoDB() {
 
 }
 
-// func getAllTheDucks() []Ducks {
+func loadHTMLIntoMemory() {
+	// Convert JSON array to slice of structs
+	err := json.Unmarshal([]byte(duckIndex), &DuckDB)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
 
-// 	allTheDucks := []Ducks{
-// 		{ID: "1", NAME: "affy", URL: "unknown"},
-// 		{ID: "2", NAME: "ffy", URL: "unknown"},
-// 		{ID: "3", NAME: "fy", URL: "unknown"},
-// 		{ID: "4", NAME: "tst", URL: "unknown"},
-// 		{ID: "5", NAME: "test2", URL: "unknown"},
-// 		{ID: "6", NAME: "test3", URL: "unknown"},
-// 		{ID: "7", NAME: "test4", URL: "unknown"},
-// 	}
-
-// 	return (allTheDucks)
-// }
+}
 
 // ListFiles retrieves the list of file names from a given directory
 func listFiles(directory string) ([]string, error) {
@@ -139,13 +137,48 @@ func getDuckImage(w http.ResponseWriter, r *http.Request) {
 	duckURL := chi.URLParam(r, "duckImageName")
 	log.Println("DuckURL = ", duckURL)
 
-	_, err := duckImages.ReadFile("assets/" + duckURL)
+	duckGraphic, err := duckImages.ReadFile("assets/" + duckURL)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 
 	}
 
-	http.ServeFile(w, r, "assets/"+duckURL)
+	w.Write([]byte(duckGraphic))
+	//http.ServeFile(w, r, "assets/"+duckURL)
+}
+
+func listFromEmbedded(ff embed.FS, startDir string) {
+	entries, err := fs.ReadDir(ff, startDir)
+	if err != nil {
+		fmt.Println("Error reading directory:", err)
+		return
+	}
+
+	for _, entry := range entries {
+		fmt.Println("Name:", entry.Name(), "IsDir:", entry.IsDir())
+	}
+}
+
+func getHTML(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+
+	page := chi.URLParam(r, "pageid")
+	//	page = strings.TrimSuffix(page, "\n")
+	log.Println("page = [" + page + "]")
+	//listFromEmbedded(htmlFS, "html")
+
+	htmlPage, err := htmlFS.ReadFile("html/" + page)
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		http.Error(w, err.Error(), http.StatusNotFound)
+
+		return
+	}
+	log.Println("serve file" + string(htmlPage))
+
+	w.Write([]byte(htmlPage))
+	//http.ServeFile(w, r, "html/")
+
 }
 
 func getParticularDuck(w http.ResponseWriter, r *http.Request) {
@@ -213,6 +246,7 @@ func main() {
 		r.Get("/{duckid}", getParticularDuck) // GET /articles/01-16-2017
 		r.Get("/index", getDuckIndex)
 		r.Get("/image/{duckImageName}", getDuckImage)
+		r.Get("/html/{pageid}", getHTML)
 	})
 
 	// Start the server
